@@ -8,10 +8,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/nodes.json"
 
-SSH_KEY="$HOME/.ssh/sre-key"
-SSH_HOST="lifenode"
-SSH_OPTS=(-i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10)
-
 SHUTDOWN_TIMEOUT=120
 SHUTDOWN_POLL_INTERVAL=5
 
@@ -46,13 +42,9 @@ load_config() {
     fi
 }
 
-ssh_cmd() {
-    ssh "${SSH_OPTS[@]}" "$SSH_HOST" "$@"
-}
-
 is_vm_running() {
     local vm_name="$1"
-    ssh_cmd "VBoxManage list runningvms" | grep -q "\"${vm_name}\""
+    VBoxManage list runningvms | grep -q "\"${vm_name}\""
 }
 
 wait_for_shutdown() {
@@ -62,7 +54,7 @@ wait_for_shutdown() {
     while is_vm_running "$vm_name"; do
         if [[ $elapsed -ge $SHUTDOWN_TIMEOUT ]]; then
             echo "Error: $vm_name did not shut down within ${SHUTDOWN_TIMEOUT}s"
-            echo "  Try: ssh ${SSH_HOST} 'VBoxManage controlvm ${vm_name} poweroff'"
+            echo "  Try: VBoxManage controlvm ${vm_name} poweroff"
             return 1
         fi
         sleep "$SHUTDOWN_POLL_INTERVAL"
@@ -77,7 +69,7 @@ stop_all() {
     for vm in "${NODES[@]}"; do
         if is_vm_running "$vm"; then
             echo "  Stopping $vm..."
-            ssh_cmd "VBoxManage controlvm $vm acpipowerbutton"
+            VBoxManage controlvm "$vm" acpipowerbutton
             running+=("$vm")
         else
             echo "  $vm is already powered off"
@@ -100,7 +92,7 @@ start_all() {
             echo "  $vm is already running"
         else
             echo "  Starting $vm..."
-            ssh_cmd "VBoxManage startvm $vm --type headless"
+            VBoxManage startvm "$vm" --type headless
         fi
     done
     echo "All VMs started"
@@ -118,7 +110,7 @@ backup_all() {
 
     for vm in "${NODES[@]}"; do
         echo "  Snapshotting $vm as '$snapshot'..."
-        ssh_cmd "VBoxManage snapshot $vm take $snapshot"
+        VBoxManage snapshot "$vm" take "$snapshot"
         echo "  $vm snapshot taken"
     done
 
@@ -135,7 +127,7 @@ restore_all() {
 
     for vm in "${NODES[@]}"; do
         echo "  Restoring $vm to '$snapshot'..."
-        ssh_cmd "VBoxManage snapshot $vm restore $snapshot"
+        VBoxManage snapshot "$vm" restore "$snapshot"
         echo "  $vm restored"
     done
 
@@ -148,7 +140,7 @@ list_all() {
     echo
     for vm in "${NODES[@]}"; do
         echo "=== $vm ==="
-        if ! ssh_cmd "VBoxManage snapshot $vm list" 2>/dev/null; then
+        if ! VBoxManage snapshot "$vm" list 2>/dev/null; then
             echo "  (no snapshots)"
         fi
         echo
@@ -161,7 +153,7 @@ format_all() {
     echo "Deleting snapshot '$snapshot' from all VMs..."
     for vm in "${NODES[@]}"; do
         echo "  Deleting '$snapshot' from $vm..."
-        ssh_cmd "VBoxManage snapshot $vm delete $snapshot"
+        VBoxManage snapshot "$vm" delete "$snapshot"
         echo "  $vm snapshot deleted"
     done
     echo "Format complete: $snapshot"
