@@ -1,0 +1,4 @@
+{
+  "nodes": ["k8s-node-1", "k8s-node-2", "k8s-node-3", "k8s-node-4"],
+  "VirtualBox-Directory": "/home/akalaj/VirtualBox"
+}
